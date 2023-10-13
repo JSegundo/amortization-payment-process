@@ -22,8 +22,6 @@ class PaymentService
             ->with('project', 'payments')
             ->get();
 
-        echo($amortizations);
-
         // loop through each amortization.
         foreach ($amortizations as $amortization) {
             //DB::transaction helps avoid inconsistencies in the database
