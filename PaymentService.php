@@ -47,22 +47,27 @@ class PaymentService
                     }
                 } else {
                     // check if the amortization is delayed
-                  if ($date->greaterThan($amortization->schedule_date)) {
-                    // collect profile emails from payments
-                    $profileEmails = $amortization->payments->pluck('profile_email')->toArray();
+                  // check if the amortization is delayed
+                    if ($date->greaterThan($amortization->schedule_date)) {
+                        // collect profile emails from payments
+                        $profileEmails = $amortization->payments->pluck('profile_email')->toArray();
 
-                    // merge them with the promoter's email
-                    $allEmails = array_merge([$project->promoter_email], $profileEmails);
+                        // merge them with the promoter's email
+                        $allEmails = array_merge([$project->promoter_email], $profileEmails);
 
-                    // send the email
-                    Mail::to($allEmails)->send(new AmortizationDelayed());
-                }
+                        // prepare the data for the email
+                        $emailData = [
+                            'projectName' => $project->name,
+                            'scheduleDate' => $amortization->schedule_date,
+                        ];
+
+                        // send the email
+                        Mail::to($allEmails)->send(new AmortizationDelayed($emailData));
+                    }
                 }
             });
         }
     }
-
-
 }
 
 
