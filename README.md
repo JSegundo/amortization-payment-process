@@ -71,7 +71,7 @@ output example
 ]
 ```
 
-Scheduled Payments
+#### Scheduled Payments
 The payAmortizations function can be scheduled as a daily cron job.
 
 ```
