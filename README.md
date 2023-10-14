@@ -29,6 +29,7 @@ I've added two new columns to two out of the three main tables: `promoter_email`
 - `amortization_id` (Foreign Key -> `Amortizations.id`)
 - `amount`
 - `state`
+  `profile_id`
 - `profile_email`
 
 ## Additional Features
