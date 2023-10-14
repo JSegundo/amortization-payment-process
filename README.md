@@ -43,7 +43,7 @@ I've created another branch called `full-project` where I've implemented:
 
 ### Retrieving Amortizations
 
-I have created routes and controllers to handle various conditions for retrieving amortizations. One of them also feeds data to a Vue.js dashboard.
+I have created routes and controllers to handle various conditions for retrieving amortizations. One of them could feed data to the Vue.js dashboard.
 
 ```
 public function getAmortizations()
