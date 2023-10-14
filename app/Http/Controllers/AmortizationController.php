@@ -14,4 +14,31 @@ class AmortizationController extends Controller
                                      ->toArray();
         return response()->json($amortizations);
     }
+
+    public function getSingleAmortization($id)
+    {
+        $amortization = Amortization::where('id',$id)->with('project', 'payments')->get();
+
+    if (!$amortization) {
+        return response()->json(['error' => 'Amortization not found'], 404);
+    }
+
+    return response()->json($amortization);
+    }
+
+ public function getAmortizationsToPay($date){
+    $amortizations = Amortization::where('state', '=', 'pending')
+        ->whereDate('schedule_date', '<=', $date)
+        ->with('project', 'payments')
+        ->get()
+        ->toArray();
+
+    if (empty($amortizations)) {
+        return response()->json(['error' => 'Amortizations not found'], 404);
+    }
+
+    return response()->json($amortizations);
+}
+
+
 }

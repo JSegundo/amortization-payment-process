@@ -18,7 +18,11 @@ Route::get('/', function () {
     return view('welcome');
 
 });
-Route::post('/make-payments/{date}', [PaymentController::class,'makePaymentsAmortizations']);
+Route::get('/make-payments', [PaymentController::class,'makePaymentsAmortizations']);
 
 Route::get('/amortizations',[AmortizationController::class, 'getAmortizations']);
+
+Route::get('/amortizations-to-pay/{date}',[AmortizationController::class, 'getAmortizationsToPay']);
+
+Route::get('/amortizations/{id}',[AmortizationController::class, 'getSingleAmortization']);
 
