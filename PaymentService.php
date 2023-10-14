@@ -14,15 +14,12 @@ class PaymentService
     public function payAmortizations(Carbon $date)
     {
         $date = $date ?? Carbon::now();
-        $date->addDays(2000);
 
         // fetch all unpaid amortizations with a schedule date equal to or before the given date.
         $amortizations = Amortization::where('state', '=', 'pending')
             ->whereDate('schedule_date', '<=', $date)
             ->with('project', 'payments')
             ->get();
-
-        echo($amortizations);
 
         // loop through each amortization.
         foreach ($amortizations as $amortization) {
