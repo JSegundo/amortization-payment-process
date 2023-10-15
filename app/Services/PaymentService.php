@@ -28,6 +28,7 @@ class PaymentService
                 // Initialize arrays to hold batch updates
                 $amortizationUpdates = [];
                 $paymentUpdates = [];
+                $projectUpdates = [];
 
                 foreach ($amortizations as $amortization) {
 
@@ -41,8 +42,11 @@ class PaymentService
                                 'state' => 'paid'
                             ];
 
-                            $project->wallet_balance -= $amortization->amount;
-                            $project->save();
+                            $newWalletBalance = $project->wallet_balance - $amortization->amount;
+                            $projectUpdates[] = [
+                                'id' => $project->id,
+                                'wallet_balance' => $newWalletBalance
+                            ];
 
                             foreach ($amortization->payments as $payment) {
                                 $paymentUpdates[] = [
@@ -53,7 +57,7 @@ class PaymentService
                         } else {
                             Log::warning('Insufficient funds for amortization', ['amortization_id' => $amortization->id]);
 
-                                if ($date->greaterThan($amortization->schedule_date)) {
+                            if ($date->greaterThan($amortization->schedule_date)) {
                             // collect profile emails from payments
                             $profileEmails = $amortization->payments->pluck('profile_email')->toArray();
 
@@ -72,13 +76,15 @@ class PaymentService
                                 'requiredAmount' => $amortization->amount,
                             ];
                             // Mail::to($insufficientFundsEmails)->queue(new InsufficientFundsEmail($emailDataIns));
-
                             }
                     });
                 }
-                // Perform batch updates outside of the loop
+                // perform batch updates outside of the loop
                 Amortization::whereIn('id', array_column($amortizationUpdates, 'id'))->update(['state' => 'paid']);
                 Payment::whereIn('id', array_column($paymentUpdates, 'id'))->update(['state' => 'paid']);
+                foreach ($projectUpdates as $update) {
+                    Project::where('id', $update['id'])->update(['wallet_balance' => $update['wallet_balance']]);
+                }
 
             });
     }
