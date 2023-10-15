@@ -13,22 +13,21 @@ class AmortizationDelayed extends Mailable
 
     public $amortization;
 
-    public function __construct($amortization)
+    public function __construct($emailData)
     {
-        $this->amortization = $amortization;
-
+        $this->emailData = $emailData;
     }
-
     /**
      * Build the message.
      *
      * @return $this
      */
-    public function build()
+   public function build()
     {
-        return $this->subject('Amortization Delayed')
-            ->view('emails.amortization_delayed')  // This is the Blade template used for the email body
+        return $this->view('emails.amortization_delayed')
             ->with([
-                'amortization' => $this->amortization
-            ]);}
+                'projectName' => $this->emailData['projectName'],
+                'scheduleDate' => $this->emailData['scheduleDate'],
+            ]);
+    }
 }

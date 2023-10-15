@@ -26,7 +26,8 @@ class AmortizationFactory extends Factory
             'schedule_date' => $this->faker->dateTimeBetween('-1 years', '+2 years'),
             'state' => $this->faker->randomElement(['pending', 'paid']),
             'amount' => $this->faker->randomFloat(2, 100, 2000),
-            'project_id' => Project::factory(),
-        ];
+            'project_id' => function () {
+                        return factory(Project::class)->create()->id;
+                    },        ];
     }
 }
