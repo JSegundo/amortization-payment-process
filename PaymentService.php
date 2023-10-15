@@ -14,7 +14,7 @@ class PaymentService
 
      public function payAmortizations(Carbon $date)
     {
-       // ensure date is set
+       // ensure date is set, default to the current date if not
         $date = $date ?? Carbon::now();
 
         // loop through amortizations in chunks to reduce memory usage
@@ -23,18 +23,21 @@ class PaymentService
             ->with('project', 'payments')
             ->chunkById(200, function ($amortizations) use ($date) {
 
-                // Initialize arrays to hold batch updates
+                // initialize arrays to hold batch updates
                 $amortizationUpdates = [];
                 $paymentUpdates = [];
                 $projectUpdates = [];
 
                 foreach ($amortizations as $amortization) {
 
-                    // Process each amortization within a database transaction
+                    // process each amortization within a database transaction
+                    // // using a transaction to make sure all changes happen successfully or not at all
                     DB::transaction(function () use ($amortization, $date, &$amortizationUpdates, &$paymentUpdates) {
                         $project = $amortization->project;
 
+                         //check wallet balance
                         if ($project->wallet_balance >= $amortization->amount) {
+                         // collecting new values for amortizations, projects, and payments to update them all at once later
                             $amortizationUpdates[] = [
                                 'id' => $amortization->id,
                                 'state' => 'paid'
@@ -57,13 +60,14 @@ class PaymentService
 
                             if ($date->greaterThan($amortization->schedule_date)) {
                             // collect profile emails from payments
-                            $profileEmails = $amortization->payments->pluck('profile_email')->toArray();
-
-                            // merge them with the promoter's email
-                            $allEmails = array_merge([$project->promoter_email], $profileEmails);
-                            $emailData = ['projectId' => $project->id, 'scheduleDate' => $amortization->schedule_date];
-                            // send the email
-                            Mail::to($allEmails)->queue(new AmortizationDelayed($emailData));
+                                 $profileEmails = $amortization->payments->pluck('profile_email')->toArray();
+     
+                                 // merge them with the promoter's email
+                                 $allEmails = array_merge([$project->promoter_email], $profileEmails);
+                                 $emailData = ['projectId' => $project->id, 'scheduleDate' => $amortization->schedule_date];
+                                 // send the email
+                                 // queue emails for delayed sending, this allows the code to continue running without waiting
+                                 Mail::to($allEmails)->queue(new AmortizationDelayed($emailData));
                             }
 
                             // send an email for insufficient funds
@@ -77,7 +81,7 @@ class PaymentService
                             }
                     });
                 }
-                // perform batch updates outside of the loop
+                // perform all batch updates outside of the loop - it reduces the number of database calls
                 Amortization::whereIn('id', array_column($amortizationUpdates, 'id'))->update(['state' => 'paid']);
                 Payment::whereIn('id', array_column($paymentUpdates, 'id'))->update(['state' => 'paid']);
                 foreach ($projectUpdates as $update) {
