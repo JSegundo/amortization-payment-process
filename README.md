@@ -35,9 +35,12 @@ I've added two new columns to two out of the three main tables: `promoter_email`
 ## Additional Features
 
 I've created another branch called `full-project` where I've implemented:
+
 - Database migrations to create the tables
 - Factories for generating fake data
 - Seeders for populating the database
+
+I've also implemented a case to send an email to the promoter when the wallet balance is insufficient to pay the amortization
 
 ## Code Snippets
 
@@ -72,6 +75,7 @@ output example
 ```
 
 #### Scheduled Payments
+
 The payAmortizations function can be scheduled as a daily cron job.
 
 ```

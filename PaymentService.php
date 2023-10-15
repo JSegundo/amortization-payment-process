@@ -11,63 +11,84 @@ use App\Mail\AmortizationDelayed;
 
 class PaymentService
 {
-    public function payAmortizations(Carbon $date)
+
+     public function payAmortizations(Carbon $date)
     {
+       // ensure date is set
         $date = $date ?? Carbon::now();
 
-        // fetch all unpaid amortizations with a schedule date equal to or before the given date.
-        $amortizations = Amortization::where('state', '=', 'pending')
+        // loop through amortizations in chunks to reduce memory usage
+            Amortization::where('state', '=', 'pending')
             ->whereDate('schedule_date', '<=', $date)
             ->with('project', 'payments')
-            ->get();
+            ->chunkById(200, function ($amortizations) use ($date) {
 
-        // loop through each amortization.
-        foreach ($amortizations as $amortization) {
-            //DB::transaction helps avoid inconsistencies in the database
-            DB::transaction(function () use ($amortization, $date) {
-                $project = $amortization->project;
+                // Initialize arrays to hold batch updates
+                $amortizationUpdates = [];
+                $paymentUpdates = [];
+                $projectUpdates = [];
 
-                // check if the project's wallet balance is sufficient.
-                if ($project->wallet_balance >= $amortization->amount) {
-                    // pay the amortization
-                    $amortization->state = 'paid';
-                    $amortization->save();
+                foreach ($amortizations as $amortization) {
 
-                    // update project's wallet balance
-                    $project->wallet_balance -= $amortization->amount;
-                    $project->save();
+                    // Process each amortization within a database transaction
+                    DB::transaction(function () use ($amortization, $date, &$amortizationUpdates, &$paymentUpdates) {
+                        $project = $amortization->project;
 
-                    // handle payments associated with this amortization
-                    foreach ($amortization->payments as $payment) {
-                        $payment->state = 'paid';
-                        $payment->save();
-                    }
-                } else {
-                    // check if the amortization is delayed
-                  // check if the amortization is delayed
-                    if ($date->greaterThan($amortization->schedule_date)) {
-                        // collect profile emails from payments
-                        $profileEmails = $amortization->payments->pluck('profile_email')->toArray();
+                        if ($project->wallet_balance >= $amortization->amount) {
+                            $amortizationUpdates[] = [
+                                'id' => $amortization->id,
+                                'state' => 'paid'
+                            ];
 
-                        // merge them with the promoter's email
-                        $allEmails = array_merge([$project->promoter_email], $profileEmails);
+                            $newWalletBalance = $project->wallet_balance - $amortization->amount;
+                            $projectUpdates[] = [
+                                'id' => $project->id,
+                                'wallet_balance' => $newWalletBalance
+                            ];
 
-                        // prepare the data for the email
-                        $emailData = [
-                            'projectName' => $project->name,
-                            'scheduleDate' => $amortization->schedule_date,
-                        ];
+                            foreach ($amortization->payments as $payment) {
+                                $paymentUpdates[] = [
+                                    'id' => $payment->id,
+                                    'state' => 'paid'
+                                ];
+                            }
+                        } else {
+                            Log::warning('Insufficient funds for amortization', ['amortization_id' => $amortization->id]);
 
-                        // send the email
-                        Mail::to($allEmails)->send(new AmortizationDelayed($emailData));
-                    }
+                            if ($date->greaterThan($amortization->schedule_date)) {
+                            // collect profile emails from payments
+                            $profileEmails = $amortization->payments->pluck('profile_email')->toArray();
+
+                            // merge them with the promoter's email
+                            $allEmails = array_merge([$project->promoter_email], $profileEmails);
+                            $emailData = ['projectId' => $project->id, 'scheduleDate' => $amortization->schedule_date];
+                            // send the email
+                            Mail::to($allEmails)->queue(new AmortizationDelayed($emailData));
+                            }
+
+                            // send an email for insufficient funds
+                            $insufficientFundsEmails = [$project->promoter_email];
+                            $emailDataIns = [
+                                'projectId' => $project->id,
+                                'walletBalance' => $project->wallet_balance,
+                                'requiredAmount' => $amortization->amount,
+                            ];
+                            Mail::to($insufficientFundsEmails)->queue(new InsufficientFundsEmail($emailDataIns));
+                            }
+                    });
                 }
+                // perform batch updates outside of the loop
+                Amortization::whereIn('id', array_column($amortizationUpdates, 'id'))->update(['state' => 'paid']);
+                Payment::whereIn('id', array_column($paymentUpdates, 'id'))->update(['state' => 'paid']);
+                foreach ($projectUpdates as $update) {
+                    Project::where('id', $update['id'])->update(['wallet_balance' => $update['wallet_balance']]);
+                }
+
             });
-        }
     }
 }
- 
-// to send the email 
+
+// to send the email example
 // App\Mail\AmortizationDelayed;
 
 // public function build()
